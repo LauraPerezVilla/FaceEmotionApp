@@ -1,21 +1,20 @@
 const ctx = document.getElementById("myChart");
-// let video = document.getElementById("videoInput");
-// let src = new cv.Mat(video.height, video.width, cv.CV_8UC4);
-// let cap = new cv.VideoCapture(video);
-// Check if the browser supports the MediaDevices API
-// if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-//     // Request access to the user's camera
-//     navigator.mediaDevices.getUserMedia({ video: true })
-//     .then((stream) => {
-//         // Set the video source to the camera stream
-//         video.srcObject = stream;
-//     })
-//     .catch((error) => {
-//         console.error("Error accessing the camera: ", error);
-//     });
-// } else {
-//     console.log("getUserMedia is not supported in this browser.");
-// }
+let video = document.getElementById("videoInput");
+
+// Checkeamos si el navegador soporta mediaDevices
+if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    // Pedimos acceso a la cámara del usuario
+    navigator.mediaDevices.getUserMedia({ video: true })
+    .then((stream) => {
+        // Set the video source to the camera stream
+        video.srcObject = stream;
+    })
+    .catch((error) => {
+        console.error("Error accediendo a la cámara: ", error);
+    });
+} else {
+    console.log("getUserMedia no es soportado por el navegador.");
+}
 
 
 var graphData = {
@@ -57,29 +56,64 @@ var graphData = {
   },
 };
 var myChart = new Chart(ctx, graphData);
+
 var socket = new WebSocket(
-  "ws://127.0.0.1:8001/ws/graph/?video_url=http://192.168.1.1:8080/video"
+  "ws://127.0.0.1:8010/ws/graph/"
 );
+// Configurar WebSocket para manejar binarios
+socket.binaryType = "arraybuffer";
+
+socket.onopen = function (e) {
+    processVideo()
+}
 
 socket.onmessage = function (e) {
-  var djangoData = JSON.parse(e.data);
-  console.log(djangoData.preds[0]);
+    var djangoData = JSON.parse(e.data);
+    console.log(djangoData);
 
-  var newGraphData = graphData.data.datasets[0].data;
-  newGraphData = djangoData.preds[0];
+    // Actualizar el gráfico
+    var newGraphData = graphData.data.datasets[0].data;
+    newGraphData = djangoData.preds[0];
 
-  graphData.data.datasets[0].data = newGraphData;
-  myChart.update();
+    graphData.data.datasets[0].data = newGraphData;
+    myChart.update();
 };
-let FPS = 30
 
-// socket.onopen = function (e) {
-//     setTimeout(processVideo, 0);
-// }
+socket.onclose = function() {
+    console.log("WebSocket connection closed");
+}
 
-// function processVideo () {
-//     let begin = Date.now();
-//     cap.read(src);
-//     socket.send(src.data)
-//     setTimeout(processVideo, 1000);
-// }
+function processVideo() {
+    let cap = new cv.VideoCapture(video);
+    let frame = new cv.Mat(video.height, video.width, cv.CV_8UC4);
+
+    function sendFrame() {
+        if (socket.readyState !== WebSocket.OPEN) return;
+
+         // Capturar el frame
+        cap.read(frame);
+
+        // Reducir la resolución del frame para enviar menos datos
+        let reducedFrame = new cv.Mat();
+        cv.resize(frame, reducedFrame, new cv.Size(320, 240)); 
+
+        let data = reducedFrame.data; // `Uint8Array` en formato [R, G, B, A, R, G, B, A ...]
+
+        // Convertir RGBA (4 canales) a RGB (3 canales)
+        let rgbArray = new Uint8Array(320 * 240 * 3);
+        let index = 0;
+        for (let i = 0; i < data.length; i += 4) {
+            rgbArray[index] = data[i];     // R
+            rgbArray[index + 1] = data[i + 1]; // G
+            rgbArray[index + 2] = data[i + 2]; // B
+            index += 3;
+        }
+
+        socket.send(rgbArray.buffer); // Enviar datos como binario
+
+        setTimeout(sendFrame, 1000); // Enviamos el frame al servidor cada 1s 
+    }
+
+    sendFrame();
+}
+

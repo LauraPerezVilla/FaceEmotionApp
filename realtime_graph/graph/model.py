@@ -23,9 +23,6 @@ class FaceEmotionModel:
         self.weightsPath = "graph/face_detector/res10_300x300_ssd_iter_140000.caffemodel"
         self.faceNet = cv2.dnn.readNet(self.prototxtPath, self.weightsPath)
         self.emotionModel = load_model("graph/face_detector/modelFEC.h5")
-        self.classes = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-        self.num_classes = len(self.classes)
-        self.colors = ['r', 'g', 'b', 'y', 'k', 'm', 'c']
     
     def predict_emotion(self, frame):
         blob = cv2.dnn.blobFromImage(frame, 1.0, (224, 224), (104.0, 177.0, 123.0))
