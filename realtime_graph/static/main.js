@@ -58,7 +58,7 @@ var graphData = {
 var myChart = new Chart(ctx, graphData);
 
 var socket = new WebSocket(
-  "ws://127.0.0.1:8010/ws/graph/"
+  "ws://127.0.0.1:8000/ws/graph/"
 );
 // Configurar WebSocket para manejar binarios
 socket.binaryType = "arraybuffer";
