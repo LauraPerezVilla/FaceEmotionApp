@@ -80,8 +80,12 @@ ASGI_APPLICATION = 'realtime_graph.asgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'face_emotion',
+        'USER': 'face_emotion',
+        'PASSWORD': 'face_emotion12345',
+        'HOST': 'localhost',
+        'PORT': '5432',
     }
 }
 
