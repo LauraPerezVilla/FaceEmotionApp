@@ -1,6 +1,17 @@
 const ctx = document.getElementById("myChart");
 let video = document.getElementById("videoInput");
 
+// Spanish translations for emotions
+const emotionTranslations = {
+    'angry': 'Enojo',
+    'disgust': 'Disgusto',
+    'fear': 'Miedo',
+    'happy': 'Felicidad',
+    'neutral': 'Neutral',
+    'sad': 'Tristeza',
+    'surprise': 'Sorpresa'
+};
+
 // Checkeamos si el navegador soporta mediaDevices
 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
     // Pedimos acceso a la cámara del usuario
@@ -19,7 +30,7 @@ if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
 var graphData = {
   type: "bar",
   data: {
-    labels: ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"],
+    labels: ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"].map(emotion => emotionTranslations[emotion]),
     datasets: [
       {
         label: "Emotion predict",
@@ -64,6 +75,31 @@ socket.binaryType = "arraybuffer";
 
 socket.onopen = function (e) {
     processVideo()
+    
+    // Add event listener to clear badge when alerts tab is clicked
+    document.getElementById('alerts-tab').addEventListener('click', function() {
+        const alertBadge = document.getElementById('alert-badge');
+        alertBadge.textContent = '0';
+        alertBadge.classList.add('d-none');
+    });
+}
+
+// Function to display alerts
+function displayAlerts(alerts) {
+    const alertsList = document.getElementById('alerts-list');
+    alerts.forEach(alert => {
+        const alertElement = document.createElement('div');
+        alertElement.className = 'list-group-item list-group-item-danger mb-2';
+        alertElement.innerHTML = `
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">Alerta de ${emotionTranslations[alert.emotion]}</h5>
+                <small>${new Date(alert.timestamp).toLocaleTimeString()}</small>
+            </div>
+            <p class="mb-1">Intensidad promedio: ${(alert.value * 100).toFixed(1)}%</p>
+            <small class="text-muted">Detectado múltiples veces</small>
+        `;
+        alertsList.insertBefore(alertElement, alertsList.firstChild);
+    });
 }
 
 socket.onmessage = function (e) {
@@ -76,6 +112,16 @@ socket.onmessage = function (e) {
 
     graphData.data.datasets[0].data = newGraphData;
     myChart.update();
+
+    // Display alerts if any
+    if (djangoData.alerts && djangoData.alerts.length > 0) {
+        displayAlerts(djangoData.alerts);
+        // Update the alert badge
+        const alertBadge = document.getElementById('alert-badge');
+        alertBadge.classList.remove('d-none');
+        const currentCount = parseInt(alertBadge.textContent);
+        alertBadge.textContent = currentCount + djangoData.alerts.length;
+    }
 };
 
 socket.onclose = function() {
