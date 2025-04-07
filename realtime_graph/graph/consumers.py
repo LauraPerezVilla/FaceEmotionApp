@@ -4,12 +4,23 @@ from channels.db import database_sync_to_async
 from .model import FaceEmotionModel, NpEncoder
 import cv2
 import numpy as np
-from .models import Session, Prediction
+from .models import Session, Prediction, Alert
 import asyncio
+from collections import defaultdict
 
 classes = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+NEGATIVE_EMOTIONS = ['angry', 'disgust', 'fear', 'sad']
+EMOTION_THRESHOLD = 0.5
+DETECTIONS_REQUIRED = 10  # Total number of detections required to trigger an alert
 
 class GraphConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Initialize counters for total detections
+        self.detection_counts = defaultdict(int)
+        # Track the sum of emotion values for averaging
+        self.emotion_sums = defaultdict(float)
+
     async def connect(self):
         # Obtenemos el id de la sesión
         self.session_id = self.scope['url_route']['kwargs']['session_id']
@@ -38,10 +49,29 @@ class GraphConsumer(AsyncWebsocketConsumer):
         locs, preds = face_model.predict_emotion(frame_bgr)
         
         # Depuración
+        alerts = []
         for (box, pred) in zip(locs, preds):
             label = "{}: {:.0f}%".format(classes[np.argmax(pred)], max(pred) * 100)
             (Xi, Yi, Xf, Yf) = box
             (angry,disgust,fear,happy,neutral,sad,surprise) = pred
+            
+            # Check for negative emotions and update detection counts
+            for i, emotion in enumerate(classes):
+                if emotion in NEGATIVE_EMOTIONS:
+                    if pred[i] >= EMOTION_THRESHOLD:
+                        self.detection_counts[emotion] += 1
+                        self.emotion_sums[emotion] += float(pred[i])
+                    
+                    # Create alert if we have enough total detections
+                    if self.detection_counts[emotion] >= DETECTIONS_REQUIRED:
+                        # Calculate average emotion value
+                        avg_value = self.emotion_sums[emotion] / self.detection_counts[emotion]
+                        alert = await self.create_alert(emotion, avg_value)
+                        alerts.append(alert)
+                        # Reset counters after creating alert
+                        self.detection_counts[emotion] = 0
+                        self.emotion_sums[emotion] = 0.0
+            
             # Accumulate the predictions
             self.predictions.append({
                 'session_id': self.session_id,
@@ -61,8 +91,26 @@ class GraphConsumer(AsyncWebsocketConsumer):
         cv2.imshow("Frame predecido", frame_bgr)
         cv2.waitKey(1)  # Mantiene la ventana activa
 
-        # Enviamos la predicción al cliente
-        await self.send(text_data=json.dumps({'loc': locs, 'preds': preds}, cls=NpEncoder))
+        # Enviamos la predicción y alertas al cliente
+        await self.send(text_data=json.dumps({
+            'loc': locs,
+            'preds': preds,
+            'alerts': alerts
+        }, cls=NpEncoder))
+
+    @database_sync_to_async
+    def create_alert(self, emotion_type, emotion_value):
+        session = Session.objects.get(session_id=self.session_id)
+        alert = Alert.objects.create(
+            session=session,
+            emotion_type=emotion_type,
+            emotion_value=emotion_value
+        )
+        return {
+            'emotion': emotion_type,
+            'value': float(emotion_value),
+            'timestamp': alert.created_at.isoformat()
+        }
 
     async def save_predictions_periodically(self):
         while True:

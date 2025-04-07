@@ -11,10 +11,12 @@ class Session(models.Model):
 
 class Alert(models.Model):
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='alerts')
+    emotion_type = models.CharField(max_length=20, null=True)
+    emotion_value = models.FloatField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Alert for session {self.session.session_id} at {self.created_at}"
+        return f"Alert for {self.emotion_type} ({self.emotion_value:.2f}) in session {self.session.session_id} at {self.created_at}"
 
 class Prediction(models.Model):
     session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='predictions')

@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
-from .models import Prediction
+from .models import Prediction, Alert
 from django.db.models import Avg
 import json
 
@@ -34,5 +34,12 @@ def history(request, session_id):
         avg_sad=Avg('sad'),
         avg_surprise=Avg('surprise')
     )
+
+    # Fetch all alerts for the given session_id
+    alerts = Alert.objects.filter(session_id=session_id).order_by('-created_at')
     
-    return render(request, 'history.html', {'averages': json.dumps(averages), 'session_id': session_id})
+    return render(request, 'history.html', {
+        'averages': json.dumps(averages),
+        'session_id': session_id,
+        'alerts': alerts
+    })
