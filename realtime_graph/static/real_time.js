@@ -12,20 +12,67 @@ const emotionTranslations = {
     'surprise': 'Sorpresa'
 };
 
-// Checkeamos si el navegador soporta mediaDevices
-if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    // Pedimos acceso a la cámara del usuario
-    navigator.mediaDevices.getUserMedia({ video: true })
-    .then((stream) => {
-        // Set the video source to the camera stream
-        video.srcObject = stream;
-    })
-    .catch((error) => {
-        console.error("Error accediendo a la cámara: ", error);
-    });
-} else {
-    console.log("getUserMedia no es soportado por el navegador.");
+const token = "eyJhbGciOiJSUzI1NiIsImtpZCI6IjkwOTg1NzhjNDg4MWRjMDVlYmYxOWExNWJhMjJkOGZkMWFiMzRjOGEiLCJ0eXAiOiJKV1QifQ.eyJuYW1lIjoiSnVhbiBFc3RlYmFuIENvcnTDqXMiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jTFVlTk1TWnFHTF93S0NKVEUyQWxoS29UMnQ0dGc0Vk1iM05kUFpoeXNXNEsySXhDVT1zOTYtYyIsImlzcyI6Imh0dHBzOi8vc2VjdXJldG9rZW4uZ29vZ2xlLmNvbS9tZWV0LWppdC1zaS02NmNiZCIsImF1ZCI6Im1lZXQtaml0LXNpLTY2Y2JkIiwiYXV0aF90aW1lIjoxNzQxNTQ5MjUzLCJ1c2VyX2lkIjoiVThVMjl2YXhIVVBzMmhFQVRjMzQyNVNhUlVJMyIsInN1YiI6IlU4VTI5dmF4SFVQczJoRUFUYzM0MjVTYVJVSTMiLCJpYXQiOjE3NDU3OTkyODIsImV4cCI6MTc0NTgwMjg4MiwiZW1haWwiOiJhbmNhZmUudmVyc2FpbGxlc0BnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZmlyZWJhc2UiOnsiaWRlbnRpdGllcyI6eyJnb29nbGUuY29tIjpbIjExNzc2NzQxMzgzMTU4NTMyMDY1MCJdLCJlbWFpbCI6WyJhbmNhZmUudmVyc2FpbGxlc0BnbWFpbC5jb20iXX0sInNpZ25faW5fcHJvdmlkZXIiOiJnb29nbGUuY29tIn19.Uf0nuP-u6ju1FtQEEjYPOctCKpvXnUUR03hqB5AGhgEc2CsADhbm02j4zLx8hEuKNpmEkE0yGgIKu8YUSTxR-kl5YvXjeVhp5-XLx8hMSPUQfIpSmfzcKHoyJuhKGSx_r4PU5uC2z3q3errhBEaLcyycN-pvbQMoGsrg-vON2yssbfOI215nH4BicN7D3xHq_YCt62LIvN-qehy6FrX6XiTDpGZGRtJGuaEmdLfxkj_c5kIGDMnqk7KBi7iOm2Imi0gQbpMdoF4F_7my8I1buHG1MU1Wblz1_bfLAciZ0YYtQhz1JO5QWEaXXQ5vvHLbbbCgDFH4MBYDrNMBJbwv_Q"
+
+// --- Jitsi Meet lib-jitsi-meet.js integration ---
+const domain = "meet.jit.si";
+const options = {
+    hosts: {
+        domain: domain,
+        muc: "conference." + domain
+    },
+    serviceUrl: `wss://${domain}/xmpp-websocket`,
+    clientNode: "http://jitsi.org/jitsimeet"
+};
+const confOptions = { openBridgeChannel: true };
+const roomName = session_id;
+
+JitsiMeetJS.init();
+
+const connection = new JitsiMeetJS.JitsiConnection(null, token, options);
+
+connection.addEventListener(
+    JitsiMeetJS.events.connection.CONNECTION_ESTABLISHED,
+    onConnectionSuccess
+);
+connection.addEventListener(
+    JitsiMeetJS.events.connection.CONNECTION_FAILED,
+    (error) => {
+        console.error("Jitsi Connection Failed", error);
+    }
+);
+connection.addEventListener(
+    JitsiMeetJS.events.connection.CONNECTION_DISCONNECTED,
+    () => console.log("Jitsi Connection Disconnected")
+);
+
+connection.connect();
+
+let conference = null;
+let remoteVideoAttached = false;
+
+function onConnectionSuccess() {
+    conference = connection.initJitsiConference(roomName, confOptions);
+    conference.on(
+        JitsiMeetJS.events.conference.TRACK_ADDED,
+        onRemoteTrack
+    );
+    conference.join();
 }
+
+function onRemoteTrack(track) {
+    if (track.getType() === "video" && !track.isLocal() && !remoteVideoAttached) {
+        // Attach to a video element
+        const stream = new MediaStream();
+        stream.addTrack(track.getTrack());
+        video.srcObject = stream;
+        video.play();
+        remoteVideoAttached = true;
+        processVideo();
+    }
+}
+
+// --- End Jitsi integration ---
 
 var graphData = {
   type: "bar",
@@ -74,8 +121,6 @@ var socket = new WebSocket(
 socket.binaryType = "arraybuffer";
 
 socket.onopen = function (e) {
-    processVideo()
-    
     // Add event listener to clear badge when alerts tab is clicked
     document.getElementById('alerts-tab').addEventListener('click', function() {
         const alertBadge = document.getElementById('alert-badge');
@@ -104,8 +149,7 @@ function displayAlerts(alerts) {
 
 socket.onmessage = function (e) {
     var djangoData = JSON.parse(e.data);
-    console.log(djangoData);
-
+    
     // Actualizar el gráfico
     var newGraphData = graphData.data.datasets[0].data;
     newGraphData = djangoData.preds[0];
