@@ -36,7 +36,7 @@ class GraphConsumer(AsyncWebsocketConsumer):
     
     @database_sync_to_async
     def create_session(self, session_id):
-        return Session.objects.create(session_id=session_id)
+        return Session.objects.get_or_create(session_id=session_id)
 
     async def receive(self, bytes_data):
         # Convertir los bytes a un numpy array (como uint8)
