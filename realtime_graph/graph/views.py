@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.http import JsonResponse
+from django.urls import reverse
 from .models import Prediction, Alert
 from django.db.models import Avg
 import json
@@ -10,15 +11,22 @@ def index(request):
 def redirect_view(request):
     session_id = request.GET.get('session_id')
     view = request.GET.get('view')
+    token = request.GET.get('token')
+    
     if view == 'real_time':
-        return redirect('real_time', session_id=session_id)
+        url = reverse('real_time', kwargs={'session_id': session_id})
+        return redirect(f"{url}?jitsi_token={token}")
     elif view == 'history':
         return redirect('history', session_id=session_id)
     else:
         return render(request, 'base.html', {'error': 'Invalid view selected'})
 
 def real_time(request, session_id):
-    return render(request, 'real_time.html', context={'session_id': session_id})
+    jitsi_token = request.GET.get('jitsi_token')
+    return render(request, 'real_time.html', context={
+        'session_id': session_id,
+        'jitsi_token': jitsi_token
+    })
 
 def history(request, session_id):
     # Fetch all predictions for the given session_id

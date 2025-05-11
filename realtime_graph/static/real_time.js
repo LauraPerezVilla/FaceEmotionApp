@@ -12,7 +12,8 @@ const emotionTranslations = {
     'surprise': 'Sorpresa'
 };
 
-const token = ""
+// Get token from Django template
+const token = jitsi_token;
 
 // --- Jitsi Meet lib-jitsi-meet.js integration ---
 const domain = "meet.jit.si";
@@ -49,7 +50,6 @@ connection.addEventListener(
 connection.connect();
 
 let conference = null;
-let remoteVideoAttached = false;
 
 function onConnectionSuccess() {
     conference = connection.initJitsiConference(roomName, confOptions);
@@ -61,13 +61,12 @@ function onConnectionSuccess() {
 }
 
 function onRemoteTrack(track) {
-    if (track.getType() === "video" && !track.isLocal() && !remoteVideoAttached) {
+    if (track.getType() === "video" && !track.isLocal()) {
         // Attach to a video element
         const stream = new MediaStream();
         stream.addTrack(track.getTrack());
         video.srcObject = stream;
         video.play();
-        remoteVideoAttached = true;
         processVideo();
     }
 }

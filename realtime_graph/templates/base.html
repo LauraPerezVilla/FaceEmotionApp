@@ -23,13 +23,36 @@
           </div>
           <div class="mb-3">
               <label for="view" class="form-label">Select View</label>
-              <select class="form-control" id="view" name="view" required>
+              <select class="form-control" id="view" name="view" required onchange="toggleTokenField()">
                   <option value="real_time">Real Time</option>
                   <option value="history">History</option>
               </select>
           </div>
+          <div class="mb-3" id="tokenField" style="display: none;">
+              <label for="token" class="form-label">Jitsi Token</label>
+              <input type="text" class="form-control" id="token" name="token">
+          </div>
           <button type="submit" class="btn btn-primary">Submit</button>
       </form>
     </div>
+
+    <script>
+        function toggleTokenField() {
+            const viewSelect = document.getElementById('view');
+            const tokenField = document.getElementById('tokenField');
+            const tokenInput = document.getElementById('token');
+            
+            if (viewSelect.value === 'real_time') {
+                tokenField.style.display = 'block';
+                tokenInput.required = true;
+            } else {
+                tokenField.style.display = 'none';
+                tokenInput.required = false;
+            }
+        }
+        
+        // Call on page load to set initial state
+        toggleTokenField();
+    </script>
   </body>
 </html>
